@@ -1,0 +1,6 @@
+{
+  "name": "USMBA Portail Doctorat (Prototype)",
+  "description": "Prototype de plateforme web de candidature, sélection et inscription doctorale pour l'Université Sidi Mohamed Ben Abdellah de Fès (USMBA).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
