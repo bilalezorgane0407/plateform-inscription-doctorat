@@ -50,13 +50,20 @@ export const Navbar: React.FC<NavbarProps> = ({
     administrateur: 'Administration Centrale',
   };
 
-  const navLinks = [
-    { id: 'catalogue', label: 'Sujets de Thèse', icon: Layers },
-    { id: 'panier', label: `Panier (${cartCount})`, icon: Layers },
-    { id: 'candidature', label: 'Ma Candidature', icon: FileText },
-    { id: 'suivi', label: 'Suivi du Dossier', icon: Clock },
-    { id: 'acteurs', label: 'Espaces Acteurs & Administration', icon: Settings },
+  const publicLinks = [
+    { id: 'catalogue', label: 'Sujets', icon: Layers },
+    { id: 'panier', label: `Panier${cartCount ? ` (${cartCount})` : ''}`, icon: Layers },
   ];
+  const candidateLinks = [
+    ...publicLinks,
+    { id: 'candidature', label: 'Mon dossier', icon: FileText },
+    { id: 'suivi', label: 'Suivi', icon: Clock },
+  ];
+  const navLinks = userRole === 'visiteur'
+    ? publicLinks
+    : userRole === 'candidat'
+      ? candidateLinks
+      : [{ id: 'acteurs', label: 'Espace de travail', icon: Settings }];
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
@@ -101,70 +108,26 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </button>
 
-          {/* Zone 2: Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1 text-sm font-medium text-slate-600">
-            <button
-              onClick={() => onSelectTab('catalogue')}
-              className={`px-3 py-2 rounded-md transition-colors whitespace-nowrap ${
-                currentTab === 'catalogue'
-                  ? 'text-blue-950 font-semibold bg-slate-100'
-                  : 'hover:text-blue-900 hover:bg-slate-50'
-              }`}
-            >
-              Sujets de Thèse
-            </button>
-
-            <button
-              onClick={() => onSelectTab('panier')}
-              className={`px-3 py-2 rounded-md transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                currentTab === 'panier'
-                  ? 'text-blue-950 font-semibold bg-slate-100'
-                  : 'hover:text-blue-900 hover:bg-slate-50'
-              }`}
-            >
-              <span>Mon Panier</span>
-              {cartCount > 0 && (
-                <span className="bg-amber-100 text-amber-900 text-xs px-2 py-0.5 rounded-full font-bold tabular-nums">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => onSelectTab('candidature')}
-              className={`px-3 py-2 rounded-md transition-colors whitespace-nowrap ${
-                currentTab === 'candidature'
-                  ? 'text-blue-950 font-semibold bg-slate-100'
-                  : 'hover:text-blue-900 hover:bg-slate-50'
-              }`}
-            >
-              Dossier & OCR
-            </button>
-
-            <button
-              onClick={() => onSelectTab('suivi')}
-              className={`px-3 py-2 rounded-md transition-colors whitespace-nowrap ${
-                currentTab === 'suivi'
-                  ? 'text-blue-950 font-semibold bg-slate-100'
-                  : 'hover:text-blue-900 hover:bg-slate-50'
-              }`}
-            >
-              Suivi & Récépissé
-            </button>
-
-            <button
-              onClick={() => onSelectTab('acteurs')}
-              className={`px-3 py-2 rounded-md transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                currentTab === 'acteurs'
-                  ? 'text-blue-950 font-semibold bg-slate-100'
-                  : 'hover:text-blue-900 hover:bg-slate-50'
-              }`}
-            >
-              <span>Espaces Acteurs</span>
-              <span className="text-[10px] uppercase font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                Multi-rôles
-              </span>
-            </button>
+          {/* La navigation ne montre que les actions utiles au rôle actif. */}
+          <nav aria-label="Navigation principale" className="hidden lg:flex items-center gap-1 text-sm font-medium text-slate-600">
+            {navLinks.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectTab(item.id)}
+                  aria-current={currentTab === item.id ? 'page' : undefined}
+                  className={`px-3 py-2 rounded-md transition-colors whitespace-nowrap flex items-center gap-2 ${
+                    currentTab === item.id
+                      ? 'text-blue-950 font-semibold bg-blue-50'
+                      : 'hover:text-blue-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" aria-hidden="true" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </nav>
 
           {/* Zone 3: 1 Primary Action Area & Role Switcher */}
@@ -173,10 +136,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="relative">
               <button
                 onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                className="text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-md px-2.5 py-1.5 flex items-center gap-1.5 transition-colors"
+                className="text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-md px-2.5 py-2 flex items-center gap-1.5 transition-colors"
                 title="Changer de rôle pour tester les différentes vues"
+                aria-expanded={roleMenuOpen}
               >
-                <span className="text-slate-500 hidden sm:inline">Rôle :</span>
+                <span className="text-slate-500 hidden sm:inline">Démo :</span>
                 <span className="font-semibold text-blue-950 truncate max-w-[120px] sm:max-w-[160px]">
                   {roleLabels[userRole]}
                 </span>
@@ -256,6 +220,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-white border-b border-slate-200 px-4 pt-2 pb-4 space-y-1">
+          <div className="pb-2 mb-2 border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {userRole === 'visiteur' ? 'Découvrir les sujets' : userRole === 'candidat' ? 'Espace candidat' : 'Espace équipe'}
+          </div>
           {navLinks.map((item) => {
             const Icon = item.icon;
             return (

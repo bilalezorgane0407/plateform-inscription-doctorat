@@ -36,6 +36,7 @@ export const TopicsCatalogue: React.FC<TopicsCatalogueProps> = ({
   const [selectedEtablissement, setSelectedEtablissement] = useState('all');
   const [selectedCedoc, setSelectedCedoc] = useState('all');
   const [filterPathway, setFilterPathway] = useState<'all' | 'lmd_master' | 'ingenieur' | 'etranger_equivalence'>('all');
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
 
   // Extract unique filter lists
   const domaines = useMemo(() => {
@@ -58,6 +59,10 @@ export const TopicsCatalogue: React.FC<TopicsCatalogueProps> = ({
         !q ||
         t.titre.toLowerCase().includes(q) ||
         t.resume.toLowerCase().includes(q) ||
+        t.code.toLowerCase().includes(q) ||
+        t.domaine.toLowerCase().includes(q) ||
+        t.etablissement.toLowerCase().includes(q) ||
+        t.cedoc.toLowerCase().includes(q) ||
         t.encadrant.nom.toLowerCase().includes(q) ||
         t.laboratoire.toLowerCase().includes(q) ||
         t.specialite.toLowerCase().includes(q) ||
@@ -109,36 +114,39 @@ export const TopicsCatalogue: React.FC<TopicsCatalogueProps> = ({
         </div>
 
         {/* Search bar */}
-        <div className="relative">
-          <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher par mot-clé, intitulé, professeur, laboratoire, intelligence artificielle, biotechnologie..."
-            className="w-full pl-11 pr-10 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-hidden focus:border-blue-900 focus:bg-white text-slate-900 transition-colors"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+        <div>
+          <label htmlFor="topic-search" className="block text-sm font-semibold text-slate-800 mb-1.5">
+            Rechercher un sujet
+          </label>
+          <div className="relative">
+            <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+            <input
+              id="topic-search"
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Ex. intelligence artificielle, nom d’un professeur ou laboratoire"
+              aria-describedby="topic-search-help"
+              className="w-full min-h-12 pl-11 pr-10 py-3 text-base bg-white border border-slate-300 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-900 text-slate-900 transition-colors"
+            />
+          </div>
+          <p id="topic-search-help" className="mt-1 text-xs text-slate-600">
+            Vous pouvez chercher par sujet, domaine, établissement, laboratoire ou encadrant.
+          </p>
         </div>
 
         {/* Faceted Selectors */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-3 pt-1 items-end">
           {/* Domaine */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label htmlFor="domain-filter" className="block text-sm font-semibold text-slate-700 mb-1.5">
               Domaine disciplinaire
             </label>
             <select
+              id="domain-filter"
               value={selectedDomaine}
               onChange={(e) => setSelectedDomaine(e.target.value)}
-              className="w-full text-xs py-2 px-3 bg-white border border-slate-300 rounded-md focus:outline-hidden focus:border-blue-900 text-slate-800"
+              className="w-full min-h-11 text-sm py-2.5 px-3 bg-white border border-slate-300 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-900 text-slate-800"
             >
               <option value="all">Tous les domaines</option>
               {domaines.map((d) => (
@@ -147,57 +155,44 @@ export const TopicsCatalogue: React.FC<TopicsCatalogueProps> = ({
             </select>
           </div>
 
-          {/* Établissement */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Établissement USMBA
-            </label>
-            <select
-              value={selectedEtablissement}
-              onChange={(e) => setSelectedEtablissement(e.target.value)}
-              className="w-full text-xs py-2 px-3 bg-white border border-slate-300 rounded-md focus:outline-hidden focus:border-blue-900 text-slate-800"
-            >
-              <option value="all">Tous les établissements</option>
-              {etablissements.map((etab) => (
-                <option key={etab} value={etab}>{etab}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* CEDoc */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Centre d’Études Doctorales (CEDoc)
-            </label>
-            <select
-              value={selectedCedoc}
-              onChange={(e) => setSelectedCedoc(e.target.value)}
-              className="w-full text-xs py-2 px-3 bg-white border border-slate-300 rounded-md focus:outline-hidden focus:border-blue-900 text-slate-800"
-            >
-              <option value="all">Tous les CEDocs</option>
-              {cedocs.map((ced) => (
-                <option key={ced} value={ced}>{ced}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Type de parcours recevable */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Recevabilité diplôme
-            </label>
-            <select
-              value={filterPathway}
-              onChange={(e) => setFilterPathway(e.target.value as any)}
-              className="w-full text-xs py-2 px-3 bg-white border border-slate-300 rounded-md focus:outline-hidden focus:border-blue-900 text-slate-800"
-            >
-              <option value="all">Tous profils</option>
-              <option value="lmd_master">Master LMD</option>
-              <option value="ingenieur">Ingénieur d’État</option>
-              <option value="etranger_equivalence">Diplôme étranger / Équivalence</option>
-            </select>
-          </div>
+          <button
+            type="button"
+            onClick={() => setAdvancedFiltersOpen((open) => !open)}
+            aria-expanded={advancedFiltersOpen}
+            className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-semibold text-blue-950 flex items-center justify-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-900"
+          >
+            <Filter className="w-4 h-4" aria-hidden="true" />
+            {advancedFiltersOpen ? 'Masquer les autres filtres' : 'Autres filtres'}
+          </button>
         </div>
+
+        {advancedFiltersOpen && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-lg bg-slate-50 border border-slate-200 p-4" aria-label="Filtres supplémentaires">
+            <div>
+              <label htmlFor="establishment-filter" className="block text-sm font-semibold text-slate-700 mb-1.5">Établissement</label>
+              <select id="establishment-filter" value={selectedEtablissement} onChange={(e) => setSelectedEtablissement(e.target.value)} className="w-full min-h-11 text-sm py-2.5 px-3 bg-white border border-slate-300 rounded-lg text-slate-800">
+                <option value="all">Tous les établissements</option>
+                {etablissements.map((etab) => <option key={etab} value={etab}>{etab}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="cedoc-filter" className="block text-sm font-semibold text-slate-700 mb-1.5">Centre doctoral</label>
+              <select id="cedoc-filter" value={selectedCedoc} onChange={(e) => setSelectedCedoc(e.target.value)} className="w-full min-h-11 text-sm py-2.5 px-3 bg-white border border-slate-300 rounded-lg text-slate-800">
+                <option value="all">Tous les centres</option>
+                {cedocs.map((ced) => <option key={ced} value={ced}>{ced}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="pathway-filter" className="block text-sm font-semibold text-slate-700 mb-1.5">Parcours académique</label>
+              <select id="pathway-filter" value={filterPathway} onChange={(e) => setFilterPathway(e.target.value as typeof filterPathway)} className="w-full min-h-11 text-sm py-2.5 px-3 bg-white border border-slate-300 rounded-lg text-slate-800">
+                <option value="all">Tous les parcours</option>
+                <option value="lmd_master">Master LMD</option>
+                <option value="ingenieur">Ingénieur d’État</option>
+                <option value="etranger_equivalence">Diplôme étranger / équivalence</option>
+              </select>
+            </div>
+          </div>
+        )}
 
         {/* Active filters reminder & reset */}
         {(searchQuery || selectedDomaine !== 'all' || selectedEtablissement !== 'all' || selectedCedoc !== 'all' || filterPathway !== 'all') && (

@@ -309,10 +309,14 @@ export default function App() {
         userRole={userRole}
         onChangeUserRole={(role) => {
           setUserRole(role);
-          if (role !== 'visiteur') {
+          if (role === 'visiteur') {
+            setIsAuthenticated(false);
+            setCurrentTab('catalogue');
+          } else if (role === 'candidat') {
             setIsAuthenticated(true);
-          }
-          if (['agent_verificateur', 'professeur', 'laboratoire', 'cedoc', 'administrateur'].includes(role)) {
+            setCurrentTab('catalogue');
+          } else {
+            setIsAuthenticated(true);
             setCurrentTab('acteurs');
           }
         }}
