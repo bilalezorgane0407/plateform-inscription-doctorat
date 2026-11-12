@@ -105,6 +105,94 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
     setCorrectionFileReplacing(null);
   };
 
+  const nextStepDetails = (() => {
+    switch (activeApp.statut) {
+      case 'pieces_a_corriger':
+        return {
+          actor: `Le Candidat (${activeApp.candidat.prenom} ${activeApp.candidat.nom})`,
+          action: 'Re-déposer la ou les pièces illisibles ou non conformes signalées par la scolarité.',
+          deadline: 'Sous 7 jours ouvrés (avant clôture de la session d’instruction)',
+          color: 'border-red-300 bg-red-50/70 text-red-950',
+          badge: 'Action immédiate requise',
+          badgeColor: 'bg-red-200 text-red-900 border-red-300',
+        };
+      case 'brouillon':
+        return {
+          actor: `Le Candidat (${activeApp.candidat.prenom} ${activeApp.candidat.nom})`,
+          action: 'Compléter le profil et téléverser les pièces obligatoires pour soumettre le dossier.',
+          deadline: 'Avant la date limite de candidature',
+          color: 'border-amber-300 bg-amber-50/70 text-amber-950',
+          badge: 'Dossier non soumis',
+          badgeColor: 'bg-amber-200 text-amber-900 border-amber-300',
+        };
+      case 'soumise':
+      case 'en_cours_verification_pieces':
+        return {
+          actor: 'Service Scolarité & Contrôle documentaire USMBA',
+          action: 'Contrôle visuel de la netteté et de la conformité des diplômes, relevés et pièces justificatives.',
+          deadline: 'Sous 3 à 5 jours ouvrés à compter du dépôt',
+          color: 'border-blue-300 bg-blue-50/70 text-blue-950',
+          badge: 'Instruction en cours',
+          badgeColor: 'bg-blue-200 text-blue-900 border-blue-300',
+        };
+      case 'verification_validee':
+      case 'examen_pedagogique':
+        return {
+          actor: 'Directeurs de thèse & Directeurs des laboratoires d’accueil',
+          action: 'Évaluation scientifique de la candidature, conformité des prérequis et émission de l’avis pédagogique.',
+          deadline: 'D’ici fin novembre (session d’évaluation scientifique)',
+          color: 'border-indigo-300 bg-indigo-50/70 text-indigo-950',
+          badge: 'Évaluation pédagogique',
+          badgeColor: 'bg-indigo-200 text-indigo-900 border-indigo-300',
+        };
+      case 'convoque_entretien':
+        return {
+          actor: `Le Candidat et la Commission CEDoc`,
+          action: 'Présentation à l’audition orale muni des diplômes originaux et du projet de recherche.',
+          deadline: activeApp.validationCedoc.dateEntretien ? `Le ${activeApp.validationCedoc.dateEntretien}` : 'Date fixée sur la convocation',
+          color: 'border-emerald-300 bg-emerald-50/70 text-emerald-950',
+          badge: 'Convocation confirmée',
+          badgeColor: 'bg-emerald-200 text-emerald-900 border-emerald-300',
+        };
+      case 'admis_liste_principale':
+        return {
+          actor: `Le Candidat et le Guichet Unique Inscription USMBA`,
+          action: 'Dépôt physique des originaux de diplômes, paiement des droits et signature de la charte des thèses.',
+          deadline: 'Sous 15 jours ouvrés',
+          color: 'border-emerald-300 bg-emerald-50/70 text-emerald-950',
+          badge: 'Admis — Inscription ouverte',
+          badgeColor: 'bg-emerald-200 text-emerald-900 border-emerald-300',
+        };
+      case 'admis_liste_attente':
+        return {
+          actor: 'Direction du CEDoc & Service Scolarité',
+          action: 'Traitement des éventuels désistements de liste principale et appel selon l’ordre de classement.',
+          deadline: 'Selon le calendrier de rentrée doctorale',
+          color: 'border-amber-300 bg-amber-50/70 text-amber-950',
+          badge: 'Liste d’attente active',
+          badgeColor: 'bg-amber-200 text-amber-900 border-amber-300',
+        };
+      case 'inscrit_administratif':
+        return {
+          actor: 'Candidat & Équipe de recherche',
+          action: 'Inscription administrative validée avec succès. Attribution de la carte d’étudiant et début des travaux.',
+          deadline: 'Année universitaire 2026-2027',
+          color: 'border-emerald-300 bg-emerald-50/70 text-emerald-950',
+          badge: 'Inscription finalisée',
+          badgeColor: 'bg-emerald-200 text-emerald-900 border-emerald-300',
+        };
+      default:
+        return {
+          actor: 'Service Scolarité Doctorat USMBA',
+          action: 'Instruction et vérification du dossier en cours.',
+          deadline: 'Sous 5 jours ouvrés',
+          color: 'border-slate-300 bg-slate-50 text-slate-900',
+          badge: 'En cours',
+          badgeColor: 'bg-slate-200 text-slate-800 border-slate-300',
+        };
+    }
+  })();
+
   return (
     <div className="py-6 sm:py-8 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
       
@@ -165,6 +253,53 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
             <Printer className="w-4 h-4 text-slate-900" />
             <span>Accusé de réception numérique</span>
           </button>
+        </div>
+      </div>
+
+      {/* PROMINENT CARD: QUI DOIT AGIR ENSUITE, ACTION ATTENDUE ET DÉLAI INDICATIF */}
+      <div className={`p-5 rounded-xl border-2 shadow-xs space-y-3 ${nextStepDetails.color}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              État d’avancement & Prochaine action
+            </span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${nextStepDetails.badgeColor}`}>
+              {nextStepDetails.badge}
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-600 font-semibold bg-white/80 border border-slate-300 px-2 py-0.5 rounded">
+            Démonstration — vérification réelle non connectée
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-1">
+          <div className="bg-white/80 p-3 rounded-lg border border-slate-200/80 space-y-0.5">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+              Qui doit agir ensuite ?
+            </span>
+            <strong className="text-slate-900 text-sm block">
+              {nextStepDetails.actor}
+            </strong>
+          </div>
+
+          <div className="bg-white/80 p-3 rounded-lg border border-slate-200/80 space-y-0.5">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+              Action attendue
+            </span>
+            <span className="text-slate-800 font-medium block">
+              {nextStepDetails.action}
+            </span>
+          </div>
+
+          <div className="bg-white/80 p-3 rounded-lg border border-slate-200/80 space-y-0.5">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+              Délai indicatif
+            </span>
+            <span className="text-slate-800 font-semibold flex items-center gap-1.5 block">
+              <Clock className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+              <span>{nextStepDetails.deadline}</span>
+            </span>
+          </div>
         </div>
       </div>
 

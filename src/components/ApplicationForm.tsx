@@ -72,6 +72,63 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
   const [ocrWorking, setOcrWorking] = useState(false);
   const [ocrDraftFields, setOcrDraftFields] = useState<OcrExtractedData | null>(null);
 
+  // File upload validation errors
+  const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
+
+  // Real file upload with format & size checking
+  const handleRealFileUpload = (docId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    const validExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const fileNameLower = file.name.toLowerCase();
+    const hasValidExt = validExtensions.some((ext) => fileNameLower.endsWith(ext));
+
+    if (!validTypes.includes(file.type) && !hasValidExt) {
+      setFileErrors((prev) => ({
+        ...prev,
+        [docId]: 'Format invalide. Seuls les fichiers PDF, JPEG et PNG sont acceptés.',
+      }));
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setFileErrors((prev) => ({
+        ...prev,
+        [docId]: 'Fichier trop volumineux. La taille maximale autorisée est de 10 Mo.',
+      }));
+      return;
+    }
+
+    // Clear any previous error
+    setFileErrors((prev) => {
+      const updated = { ...prev };
+      delete updated[docId];
+      return updated;
+    });
+
+    const sizeStr = file.size > 1024 * 1024
+      ? `${(file.size / (1024 * 1024)).toFixed(1)} Mo`
+      : `${Math.round(file.size / 1024)} Ko`;
+
+    setDocuments((prev) =>
+      prev.map((d) => {
+        if (d.id === docId) {
+          return {
+            ...d,
+            statut: 'recue',
+            fichierNom: file.name,
+            fichierTaille: sizeStr,
+            fichierDate: new Date().toLocaleDateString('fr-FR'),
+            ocrLu: false,
+          };
+        }
+        return d;
+      })
+    );
+  };
+
   // Update documents when pathway or salary status changes
   useEffect(() => {
     setDocuments((prevDocs) => {
@@ -356,9 +413,9 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
             Sujets retenus pour ce dossier ({selectedTopics.length} / {config.maxSujetsParCandidat})
           </span>
           <div className="flex flex-wrap gap-2 text-xs font-semibold text-blue-950">
-            {selectedTopics.map((t, idx) => (
+            {selectedTopics.map((t) => (
               <span key={t.id} className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                Choix #{idx + 1} : {t.code} · {t.titre.substring(0, 48)}...
+                {t.code} · {t.titre.substring(0, 48)}...
               </span>
             ))}
           </div>
@@ -674,6 +731,17 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
             </div>
           </div>
 
+          {/* Administrative Disclaimer for Document Checklist */}
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-950 flex items-start gap-2.5">
+            <HelpCircle className="w-4 h-4 text-amber-800 shrink-0 mt-0.5" />
+            <div>
+              <strong className="font-bold text-amber-900 block">Note de conception (Prototype) :</strong>
+              <span>
+                La liste des pièces exigées et les critères d’admissibilité constituent des hypothèses de travail pour ce prototype et doivent être confirmés par les autorités compétentes de l’USMBA avant tout déploiement officiel.
+              </span>
+            </div>
+          </div>
+
           {/* Checklist of dynamic required documents */}
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">
             
@@ -693,13 +761,16 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
             </div>
 
             {/* List of documents */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               {documents.map((doc) => {
                 const isNeedCorrection = doc.statut === 'a_corriger';
+                const fileError = fileErrors[doc.id];
+                const isForeignAtypical = candidateProfile.parcours === 'etranger_equivalence' || candidateProfile.parcours === 'autre_specifique' || doc.code === 'arrete_equivalence';
+
                 return (
                   <div
                     key={doc.id}
-                    className={`p-4 rounded-xl border transition-all ${
+                    className={`p-4 sm:p-5 rounded-xl border transition-all space-y-3 ${
                       isNeedCorrection
                         ? 'border-red-300 bg-red-50/40'
                         : doc.statut === 'recue' || doc.statut === 'verifiee'
@@ -708,7 +779,7 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                      <div className="space-y-1 max-w-2xl">
+                      <div className="space-y-1.5 max-w-2xl">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-slate-900">
                             {doc.intitule}
@@ -740,6 +811,14 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
                           </div>
                         )}
 
+                        {/* Inline upload error message */}
+                        {fileError && (
+                          <div className="p-2 bg-red-100 border border-red-300 rounded-lg text-xs text-red-900 font-medium flex items-center gap-1.5">
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-700 shrink-0" />
+                            <span>{fileError}</span>
+                          </div>
+                        )}
+
                         {/* Specific Correction reason if marked "À corriger" */}
                         {isNeedCorrection && (
                           <div className="mt-2 p-3 bg-red-100/70 border border-red-300 rounded-lg text-xs text-red-950 space-y-1">
@@ -753,52 +832,108 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
                             </div>
                           </div>
                         )}
-
-                        {/* OCR separation indicator */}
-                        {doc.ocrLu && doc.ocrData && (
-                          <div className="mt-2 p-2.5 bg-blue-50/60 border border-blue-200/70 rounded-lg text-xs text-blue-950 flex items-start justify-between gap-2">
-                            <div>
-                              <span className="font-bold block flex items-center gap-1.5 text-blue-900">
-                                <Sparkles className="w-3.5 h-3.5 text-blue-700" />
-                                Données extraites par OCR (Vérifiées par le candidat)
-                              </span>
-                              <span className="text-[11px] text-slate-600 block mt-0.5">
-                                Nom : {doc.ocrData.nom?.value || candidateProfile.nom} · Diplôme : {doc.ocrData.diplomeIntitule?.value || candidateProfile.derniereFormation.intituleDiplome}
-                              </span>
-                            </div>
-                            <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 shrink-0">
-                              OCR ≠ Authentifié
-                            </span>
-                          </div>
-                        )}
                       </div>
 
                       {/* Right side: Status and actions */}
                       <div className="flex flex-col sm:items-end gap-2 shrink-0">
                         {renderStatusBadge(doc.statut)}
 
-                        <div className="flex items-center gap-2 pt-1">
-                          {/* If doc supports OCR and not uploaded yet or need correction */}
-                          {(doc.code === 'diplome_master' || doc.code === 'diplome_ingenieur' || doc.code === 'cin_passeport') ? (
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {/* Real file upload input */}
+                          <label className="px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs">
+                            <Upload className="w-3.5 h-3.5 text-slate-600" />
+                            <span>{doc.statut === 'a_deposer' ? 'Sélectionner fichier' : 'Remplacer'}</span>
+                            <input
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                              onChange={(e) => handleRealFileUpload(doc.id, e)}
+                              className="hidden"
+                            />
+                          </label>
+
+                          {/* Quick simulated OCR assistant for diploma & CIN */}
+                          {(doc.code === 'diplome_master' || doc.code === 'diplome_ingenieur' || doc.code === 'cin_passeport') && (
                             <button
                               onClick={() => handleStartOcrSimulation(doc)}
                               className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                              title="Déclencher l'analyse OCR assistée"
                             >
                               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                              <span>{doc.statut === 'a_deposer' ? 'Déposer avec OCR' : 'Re-scanner par OCR'}</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleSimulateUpload(doc.id, `${doc.code}_document.pdf`)}
-                              className="px-3 py-1.5 text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-                            >
-                              <Upload className="w-3.5 h-3.5 text-slate-600" />
-                              <span>{doc.statut === 'a_deposer' ? 'Téléverser PDF' : 'Remplacer fichier'}</span>
+                              <span>{doc.statut === 'a_deposer' ? 'Aide OCR' : 'Re-scanner OCR'}</span>
                             </button>
                           )}
                         </div>
                       </div>
                     </div>
+
+                    {/* Visually Separated 4 Document Status Indicators */}
+                    {doc.statut !== 'a_deposer' && (
+                      <div className="mt-3 pt-3 border-t border-slate-200/80 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                            États de vérification du document :
+                          </span>
+                          <span className="text-[10px] text-amber-800 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                            Démonstration — vérification réelle non connectée
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          {/* 1. OCR Extraction status */}
+                          <div className={`p-2 rounded-lg border flex items-center gap-1.5 ${
+                            doc.ocrLu
+                              ? 'bg-blue-50 border-blue-200 text-blue-900 font-medium'
+                              : 'bg-slate-50 border-slate-200 text-slate-400'
+                          }`}>
+                            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">Texte extrait par OCR</span>
+                          </div>
+
+                          {/* 2. Candidate confirmed status */}
+                          <div className={`p-2 rounded-lg border flex items-center gap-1.5 ${
+                            doc.ocrLu && doc.ocrData
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-900 font-medium'
+                              : 'bg-slate-50 border-slate-200 text-slate-400'
+                          }`}>
+                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">Confirmé par candidat</span>
+                          </div>
+
+                          {/* 3. Issuer verification pending */}
+                          <div className={`p-2 rounded-lg border flex items-center gap-1.5 ${
+                            doc.statut === 'recue' || doc.statut === 'verification_en_cours'
+                              ? 'bg-amber-50 border-amber-200 text-amber-900 font-medium'
+                              : 'bg-slate-50 border-slate-200 text-slate-400'
+                          }`}>
+                            <Clock className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">Vérif. émetteur en attente</span>
+                          </div>
+
+                          {/* 4. Human examination required */}
+                          <div className={`p-2 rounded-lg border flex items-center gap-1.5 ${
+                            isForeignAtypical || doc.statut === 'verification_manuelle_requise'
+                              ? 'bg-purple-50 border-purple-200 text-purple-900 font-medium'
+                              : 'bg-slate-50 border-slate-200 text-slate-400'
+                          }`}>
+                            <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">Examen humain requis</span>
+                          </div>
+                        </div>
+
+                        {/* OCR text display if available */}
+                        {doc.ocrLu && doc.ocrData && (
+                          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 flex flex-wrap items-center justify-between gap-2">
+                            <span>
+                              Données lues : Nom : <strong>{doc.ocrData.nom?.value || candidateProfile.nom}</strong> · Diplôme : <strong>{doc.ocrData.diplomeIntitule?.value || candidateProfile.derniereFormation.intituleDiplome}</strong>
+                            </span>
+                            <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 shrink-0">
+                              OCR ≠ Authentification officielle
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                   </div>
                 );
               })}
@@ -908,8 +1043,8 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-slate-100">
                       <div>
-                        <span className="font-mono text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                          Sujet #{index + 1} · {topic.code}
+                        <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                          {topic.code} · Sujet sélectionné
                         </span>
                         <h4 className="text-base font-bold text-slate-900 mt-1">
                           {topic.titre}
@@ -1066,25 +1201,44 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
           </div>
 
           {/* Chosen Topics */}
+          {/* Chosen Topics with Dynamic Diagnostic Badges (Fix Rule 18) */}
           <div className="p-4 rounded-xl border border-slate-200 space-y-3">
             <span className="font-bold text-slate-900 block text-xs uppercase tracking-wider">
               {selectedTopics.length} Sujet(s) postulé(s) (sans hiérarchisation)
             </span>
             <div className="space-y-2">
-              {selectedTopics.map((t, idx) => (
-                <div key={t.id} className="p-3 bg-slate-50 rounded-lg text-xs flex items-center justify-between gap-3">
-                  <div>
-                    <span className="font-mono text-[11px] text-slate-500 font-bold mr-2">#{idx + 1} {t.code}</span>
-                    <strong className="text-slate-900">{t.titre}</strong>
-                    <div className="text-slate-500 text-[11px] mt-0.5">
-                      {t.etablissement} · {t.laboratoire} · Encadrant : {t.encadrant.nom}
+              {selectedTopics.map((t) => {
+                const topicDiag = topicDiagnostics.find((item) => item.topic.id === t.id)?.diagnostic;
+                const status = topicDiag?.diagnosticGlobal;
+
+                let badgeColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+                let badgeLabel = 'Critères déclarés satisfaits';
+                if (status === 'info_manquante') {
+                  badgeColor = 'text-amber-800 bg-amber-50 border-amber-300';
+                  badgeLabel = 'Information manquante';
+                } else if (status === 'examen_humain_requis') {
+                  badgeColor = 'text-blue-800 bg-blue-50 border-blue-300';
+                  badgeLabel = 'Examen humain requis';
+                } else if (status === 'potentiellement_non_satisfait') {
+                  badgeColor = 'text-purple-800 bg-purple-50 border-purple-300';
+                  badgeLabel = 'Critère à examiner';
+                }
+
+                return (
+                  <div key={t.id} className="p-3 bg-slate-50 rounded-lg text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="font-mono text-[11px] text-slate-600 font-bold mr-2">{t.code}</span>
+                      <strong className="text-slate-900">{t.titre}</strong>
+                      <div className="text-slate-500 text-[11px] mt-0.5">
+                        {t.etablissement} · {t.laboratoire} · Encadrant : {t.encadrant.nom}
+                      </div>
                     </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border shrink-0 ${badgeColor}`}>
+                      {badgeLabel}
+                    </span>
                   </div>
-                  <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px] font-semibold shrink-0">
-                    Sujet éligible
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

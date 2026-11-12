@@ -184,24 +184,31 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {roleMenuOpen && (
                 <div 
-                  className="absolute right-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 z-50 text-xs"
+                  className="absolute right-0 mt-1 w-72 bg-white border border-slate-200 rounded-lg shadow-lg py-2 z-50 text-xs"
                   onClick={() => setRoleMenuOpen(false)}
                 >
-                  <div className="px-3 py-1 font-semibold text-slate-400 uppercase tracking-wider text-[10px]">
-                    Tester en tant que :
+                  <div className="px-3 pb-1 border-b border-slate-100">
+                    <span className="font-bold text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider block">
+                      Mode démonstration
+                    </span>
+                    <span className="text-[11px] text-slate-500 mt-1 block">
+                      Sélecteur de vue (simulation sans contrôle d'accès réel)
+                    </span>
                   </div>
-                  {(Object.keys(roleLabels) as UserRole[]).map((role) => (
-                    <button
-                      key={role}
-                      onClick={() => onChangeUserRole(role)}
-                      className={`w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between ${
-                        userRole === role ? 'font-semibold text-blue-900 bg-blue-50/50' : 'text-slate-700'
-                      }`}
-                    >
-                      <span>{roleLabels[role]}</span>
-                      {userRole === role && <CheckCircle2 className="w-4 h-4 text-blue-700" />}
-                    </button>
-                  ))}
+                  <div className="pt-1.5">
+                    {(Object.keys(roleLabels) as UserRole[]).map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => onChangeUserRole(role)}
+                        className={`w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between ${
+                          userRole === role ? 'font-semibold text-blue-900 bg-blue-50/50' : 'text-slate-700'
+                        }`}
+                      >
+                        <span>{roleLabels[role]}</span>
+                        {userRole === role && <CheckCircle2 className="w-4 h-4 text-blue-700" />}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

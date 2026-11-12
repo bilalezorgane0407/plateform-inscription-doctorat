@@ -110,8 +110,8 @@ export const CartView: React.FC<CartViewProps> = ({
             >
               <div className="space-y-2 max-w-3xl">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                    Choix #{index + 1} · {topic.code}
+                  <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                    {topic.code} · Sujet sélectionné (sans classement)
                   </span>
                   <span className="text-xs text-slate-500">{topic.anneeUniversitaire}</span>
                 </div>

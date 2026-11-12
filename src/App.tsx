@@ -5,6 +5,7 @@ import { TopicsCatalogue } from './components/TopicsCatalogue';
 import { TopicDetailModal } from './components/TopicDetailModal';
 import { CartView } from './components/CartView';
 import { AuthModal } from './components/AuthModal';
+import { AuthScreen } from './components/AuthScreen';
 import { ApplicationForm } from './components/ApplicationForm';
 import { TrackingView } from './components/TrackingView';
 import { RoleDashboards } from './components/RoleDashboards';
@@ -36,11 +37,8 @@ export default function App() {
   const [topics, setTopics] = useState<Topic[]>(MOCK_TOPICS);
   const [selectedTopicModal, setSelectedTopicModal] = useState<Topic | null>(null);
 
-  // Cart: Up to 3 topics by default, not ranked
-  const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([
-    MOCK_TOPICS[0].id,
-    MOCK_TOPICS[1].id,
-  ]);
+  // Cart: Up to 3 topics by default, not ranked. Initialized empty!
+  const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
 
   // Auth & Roles
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -72,7 +70,8 @@ export default function App() {
   // Click on "Continuer ma candidature"
   const handleContinueApplication = () => {
     if (!isAuthenticated) {
-      setAuthModalOpen(true);
+      // Dedicated auth page instead of popup modal
+      setCurrentTab('auth');
     } else {
       setCurrentTab('candidature');
     }
@@ -319,13 +318,22 @@ export default function App() {
         }}
         isAuthenticated={isAuthenticated}
         currentUserNom={candidateProfile ? `${candidateProfile.prenom} ${candidateProfile.nom}` : undefined}
-        onOpenAuth={() => setAuthModalOpen(true)}
+        onOpenAuth={() => setCurrentTab('auth')}
         onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
       <main className="flex-1">
         
+        {/* Tab 0: Dedicated Auth Screen (non-modal) */}
+        {currentTab === 'auth' && (
+          <AuthScreen
+            selectedTopics={selectedTopics}
+            onLoginSuccess={handleLoginSuccess}
+            onCancel={() => setCurrentTab('panier')}
+          />
+        )}
+
         {/* Tab 1: Catalogue & Home */}
         {currentTab === 'catalogue' && (
           <div>
