@@ -3,19 +3,14 @@ import {
   Users, 
   GraduationCap, 
   Building2, 
-  ShieldCheck, 
   Sliders, 
   CheckCircle2, 
   AlertTriangle, 
   FileText, 
   Clock, 
   Calendar, 
-  Eye, 
-  Check, 
   X, 
   RotateCw,
-  Search,
-  Filter,
   BarChart3,
   HelpCircle
 } from 'lucide-react';
@@ -27,6 +22,7 @@ import {
   DocumentStatus,
   VerificationMethod
 } from '../types';
+import { AgentVerificationWorkspace } from './AgentVerificationWorkspace';
 
 interface RoleDashboardsProps {
   currentRole: UserRole;
@@ -36,7 +32,7 @@ interface RoleDashboardsProps {
   config: PlatformConfig;
   onUpdateConfig: (newConfig: PlatformConfig) => void;
   onUpdateApplicationStatus: (appId: string, status: any, historyLog: string) => void;
-  onUpdateDocVerification: (appId: string, docId: string, status: DocumentStatus, method: VerificationMethod, motif?: string) => void;
+  onUpdateDocVerification: (appId: string, docId: string, status: DocumentStatus, method: VerificationMethod, motif?: string, actionAttendue?: string) => void;
   onSaveProfessorAvis: (appId: string, topicId: string, avis: 'favorable' | 'reserve' | 'defavorable', motif: string) => void;
   onScheduleInterview: (appId: string, date: string, lieu: string) => void;
 }
@@ -58,11 +54,6 @@ export const RoleDashboards: React.FC<RoleDashboardsProps> = ({
   const [profAvis, setProfAvis] = useState<'favorable' | 'reserve' | 'defavorable'>('favorable');
   const [profMotif, setProfMotif] = useState('');
   
-  // Local state for agent verification
-  const [agentMotifCorrection, setAgentMotifCorrection] = useState('');
-  const [agentActionAttendue, setAgentActionAttendue] = useState('');
-  const [showAgentRejectBox, setShowAgentRejectBox] = useState<string | null>(null);
-
   // Local state for CEDoc interview planning
   const [interviewDate, setInterviewDate] = useState('18 Décembre 2026 à 10h00');
   const [interviewLieu, setInterviewLieu] = useState('Salle des Actes, FST Fès');
@@ -98,240 +89,42 @@ export const RoleDashboards: React.FC<RoleDashboardsProps> = ({
       
       {/* Role Navigation Tabs */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
-        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 text-xs font-semibold">
-          <span className="text-slate-400 uppercase tracking-wider text-[11px] px-2 shrink-0">
-            Espace Acteur :
-          </span>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {[
-              { id: 'agent_verificateur', label: 'Agent Vérificateur (Scolarité)' },
-              { id: 'professeur', label: 'Professeur / Encadrant' },
-              { id: 'laboratoire', label: 'Conseil de Laboratoire' },
-              { id: 'cedoc', label: 'Formation Doctorale / CEDoc' },
-              { id: 'administrateur', label: 'Administration Centrale' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => onChangeRole(tab.id as UserRole)}
-                className={`px-3 py-2 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                  currentRole === tab.id
-                    ? 'bg-blue-900 text-white font-bold shadow-xs'
-                    : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Espace de démonstration — choisissez une vue
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {[
+            { id: 'agent_verificateur', label: 'Contrôle des pièces' },
+            { id: 'professeur', label: 'Encadrant' },
+            { id: 'laboratoire', label: 'Laboratoire' },
+            { id: 'cedoc', label: 'CEDoc' },
+            { id: 'administrateur', label: 'Administration' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onChangeRole(tab.id as UserRole)}
+              aria-pressed={currentRole === tab.id}
+              className={`min-h-11 rounded-lg px-2 py-2 text-xs sm:text-sm transition-colors ${
+                currentRole === tab.id
+                  ? 'bg-blue-900 text-white font-bold shadow-xs'
+                  : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 1. AGENT VÉRIFICATEUR (SCOLARITÉ - OCR VS SCAN) */}
-      {/* ========================================================================= */}
       {currentRole === 'agent_verificateur' && (
-        <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-blue-900" />
-                Guichet de Contrôle des Pièces & Validation des Données OCR
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Vérification des pièces numérisées, rapprochement avec l’extraction OCR et validation d'authenticité.
-              </p>
-            </div>
-
-            {/* Select dossier to inspect */}
-            <div className="flex items-center gap-2 shrink-0">
-              <label className="text-xs font-semibold text-slate-700">Dossier :</label>
-              <select
-                value={selectedAppId}
-                onChange={(e) => setSelectedAppId(e.target.value)}
-                className="text-xs py-1.5 px-3 bg-white border border-slate-300 rounded-lg text-slate-900 font-bold"
-              >
-                {applications.map((app) => (
-                  <option key={app.id} value={app.id}>
-                    {app.numeroDossier} — {app.candidat.nom} {app.candidat.prenom}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Dossier inspection panel */}
-          {selectedApp && (
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-5">
-              
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
-                <div>
-                  <span className="font-mono text-xs font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
-                    {selectedApp.numeroDossier}
-                  </span>
-                  <h4 className="text-base font-bold text-slate-900 mt-1">
-                    Candidat : {selectedApp.candidat.nom} {selectedApp.candidat.prenom}
-                  </h4>
-                  <p className="text-xs text-slate-500">
-                    CIN : {selectedApp.candidat.cin} · CNE : {selectedApp.candidat.cneMassar} · Diplôme déclaré : {selectedApp.candidat.derniereFormation.intituleDiplome}
-                  </p>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-xs font-bold uppercase text-slate-500 block">Statut dossier</span>
-                  <span className="text-xs font-bold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-full">
-                    {selectedApp.statut.replace(/_/g, ' ')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Table of pieces to verify */}
-              <div className="space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-600 block">
-                  Pièces justificatives déposées ({selectedApp.documents.length}) :
-                </span>
-
-                <div className="space-y-3">
-                  {selectedApp.documents.map((doc) => {
-                    const isRejecting = showAgentRejectBox === doc.id;
-
-                    return (
-                      <div
-                        key={doc.id}
-                        className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-slate-900">{doc.intitule}</span>
-                              <span className="text-xs font-mono text-slate-500">({doc.fichierNom || 'Non fourni'})</span>
-                            </div>
-                            
-                            {/* OCR extraction display */}
-                            {doc.ocrLu && doc.ocrData ? (
-                              <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs space-y-1">
-                                <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1">
-                                  Données OCR extraites :
-                                </span>
-                                <div className="text-slate-700">
-                                  {doc.ocrData.diplomeIntitule && <div>Diplôme : {doc.ocrData.diplomeIntitule.value}</div>}
-                                  {doc.ocrData.etablissement && <div>Émetteur : {doc.ocrData.etablissement.value}</div>}
-                                  {doc.ocrData.mention && <div>Mention : {doc.ocrData.mention.value}</div>}
-                                </div>
-                                <span className="text-[10px] text-slate-400 block pt-0.5">
-                                  Note d'audit : Rapprochement scan effectué avec la base centrale scolarité.
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-slate-500">Document textuel PDF classique.</span>
-                            )}
-                          </div>
-
-                          {/* Verification actions */}
-                          <div className="flex flex-col sm:items-end gap-2 shrink-0">
-                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border bg-white">
-                              {doc.statut.replace(/_/g, ' ')}
-                            </span>
-
-                            <div className="flex items-center gap-2 pt-1">
-                              <button
-                                onClick={() =>
-                                  onUpdateDocVerification(
-                                    selectedApp.id,
-                                    doc.id,
-                                    'verifiee',
-                                    'emetteur_direct'
-                                  )
-                                }
-                                className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-md transition-colors flex items-center gap-1 cursor-pointer"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                <span>Valider pièce</span>
-                              </button>
-
-                              <button
-                                onClick={() => setShowAgentRejectBox(isRejecting ? null : doc.id)}
-                                className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-colors cursor-pointer"
-                              >
-                                <span>Demander correction</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Expandable reject / ask correction box */}
-                        {isRejecting && (
-                          <div className="p-3 bg-red-50 border border-red-200 rounded-lg space-y-2 text-xs">
-                            <span className="font-bold text-red-950 block">
-                              Motiver la demande de correction transmise au candidat :
-                            </span>
-                            <input
-                              type="text"
-                              value={agentMotifCorrection}
-                              onChange={(e) => setAgentMotifCorrection(e.target.value)}
-                              placeholder="ex. Numérisation floue, le sceau du Doyen n’est pas lisible."
-                              className="w-full px-3 py-1.5 bg-white border border-red-300 rounded text-slate-900"
-                            />
-                            <input
-                              type="text"
-                              value={agentActionAttendue}
-                              onChange={(e) => setAgentActionAttendue(e.target.value)}
-                              placeholder="ex. Déposer un nouveau scan haute définition en couleur (PDF)."
-                              className="w-full px-3 py-1.5 bg-white border border-red-300 rounded text-slate-900"
-                            />
-                            <div className="flex justify-end gap-2 pt-1">
-                              <button
-                                onClick={() => setShowAgentRejectBox(null)}
-                                className="px-3 py-1 text-slate-600 hover:bg-slate-200 rounded"
-                              >
-                                Annuler
-                              </button>
-                              <button
-                                onClick={() => {
-                                  onUpdateDocVerification(
-                                    selectedApp.id,
-                                    doc.id,
-                                    'a_corriger',
-                                    'agent_manuel',
-                                    agentMotifCorrection || 'Document incomplet ou illisible'
-                                  );
-                                  setShowAgentRejectBox(null);
-                                  setAgentMotifCorrection('');
-                                }}
-                                className="px-3 py-1 text-white bg-red-700 hover:bg-red-800 rounded font-bold"
-                              >
-                                Envoyer la demande au candidat
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Validate entire folder */}
-              <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
-                <button
-                  onClick={() =>
-                    onUpdateApplicationStatus(
-                      selectedApp.id,
-                      'verification_validee',
-                      'Contrôle scolarité : toutes les pièces administratives sont certifiées conformes.'
-                    )
-                  }
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-900 hover:bg-blue-800 rounded-lg transition-colors cursor-pointer shadow-xs"
-                >
-                  Valider l'ensemble du dossier et transmettre aux encadrants
-                </button>
-              </div>
-
-            </div>
-          )}
-
-        </div>
+        <AgentVerificationWorkspace
+          applications={applications}
+          selectedAppId={selectedAppId}
+          onSelectApplication={setSelectedAppId}
+          onUpdateDocVerification={onUpdateDocVerification}
+          onUpdateApplicationStatus={onUpdateApplicationStatus}
+        />
       )}
 
       {/* ========================================================================= */}

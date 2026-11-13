@@ -111,6 +111,14 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
     const sizeStr = file.size > 1024 * 1024
       ? `${(file.size / (1024 * 1024)).toFixed(1)} Mo`
       : `${Math.round(file.size / 1024)} Ko`;
+    const previousPreview = documents.find((document) => document.id === docId)?.fichierApercuUrl;
+    if (previousPreview?.startsWith('blob:')) URL.revokeObjectURL(previousPreview);
+    const previewUrl = URL.createObjectURL(file);
+    const previewMimeType = file.type || (fileNameLower.endsWith('.pdf')
+      ? 'application/pdf'
+      : fileNameLower.endsWith('.png')
+        ? 'image/png'
+        : 'image/jpeg');
 
     setDocuments((prev) =>
       prev.map((d) => {
@@ -121,6 +129,8 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
             fichierNom: file.name,
             fichierTaille: sizeStr,
             fichierDate: new Date().toLocaleDateString('fr-FR'),
+            fichierApercuUrl: previewUrl,
+            fichierTypeMime: previewMimeType,
             ocrLu: false,
           };
         }
@@ -742,6 +752,11 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
             </div>
           </div>
 
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3 text-sm text-blue-950">
+            <strong className="block">Démonstration du dépôt</strong>
+            Le fichier sélectionné peut être aperçu pendant cette session. Il n’est pas transmis ni conservé dans un stockage sécurisé.
+          </div>
+
           {/* Checklist of dynamic required documents */}
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">
             
@@ -826,9 +841,9 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
                               <AlertTriangle className="w-4 h-4 text-red-700" />
                               <span>Motif de la demande de correction :</span>
                             </div>
-                            <p>{doc.motifCorrection}</p>
+                            <p dir="auto">{doc.motifCorrection}</p>
                             <div className="font-semibold text-red-900 pt-0.5">
-                              Action attendue : <span className="font-normal">{doc.actionAttendue}</span>
+                              Action attendue : <span dir="auto" className="font-normal">{doc.actionAttendue}</span>
                             </div>
                           </div>
                         )}

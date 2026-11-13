@@ -333,11 +333,11 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
                   </div>
                   <div className="text-red-950">
                     <strong>Motif : </strong>
-                    <span>{doc.motifCorrection || 'Document flou ou illisible'}</span>
+                    <span dir="auto">{doc.motifCorrection || 'Document flou ou illisible'}</span>
                   </div>
                   <div className="text-slate-700">
                     <strong>Action attendue : </strong>
-                    <span>{doc.actionAttendue || 'Re-déposer une numérisation nette en couleur (PDF)'}</span>
+                    <span dir="auto">{doc.actionAttendue || 'Re-déposer une numérisation nette en couleur (PDF)'}</span>
                   </div>
                 </div>
 

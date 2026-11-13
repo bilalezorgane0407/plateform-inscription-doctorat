@@ -50,6 +50,8 @@ export interface CandidateDocument {
   fichierNom?: string;
   fichierTaille?: string;
   fichierDate?: string;
+  fichierApercuUrl?: string;
+  fichierTypeMime?: string;
   ocrData?: OcrExtractedData;
   ocrLu: boolean;
   methodeVerification?: VerificationMethod;

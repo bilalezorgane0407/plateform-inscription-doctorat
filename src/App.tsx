@@ -179,7 +179,8 @@ export default function App() {
     docId: string,
     status: DocumentStatus,
     method: VerificationMethod,
-    motif?: string
+    motif?: string,
+    actionAttendue?: string,
   ) => {
     setApplications((prev) =>
       prev.map((a) => {
@@ -190,9 +191,9 @@ export default function App() {
                 ...d,
                 statut: status,
                 methodeVerification: method,
-                motifCorrection: motif,
-                actionAttendue: motif ? 'Veuillez téléverser un document net et conforme.' : undefined,
-                verifiePar: 'Agent de contrôle scolarité USMBA',
+                motifCorrection: status === 'a_corriger' ? motif : undefined,
+                actionAttendue: actionAttendue || (status === 'a_corriger' ? 'Veuillez déposer une nouvelle version de cette pièce.' : undefined),
+                verifiePar: 'Agent de contrôle (mode démonstration)',
                 dateVerification: new Date().toLocaleDateString('fr-FR'),
               };
             }
@@ -209,7 +210,11 @@ export default function App() {
                 date: `${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`,
                 acteur: 'Agent de contrôle scolarité',
                 role: 'Scolarité',
-                action: `Contrôle de la pièce : ${status === 'verifiee' ? 'Validée' : 'Demande de correction'}.`,
+                action: status === 'verifiee'
+                  ? 'Contrôle administratif de la pièce terminé.'
+                  : status === 'a_corriger'
+                    ? 'Demande de correction envoyée au candidat.'
+                    : 'Pièce transmise pour examen humain complémentaire.',
                 motif: motif,
               },
               ...a.historique,
