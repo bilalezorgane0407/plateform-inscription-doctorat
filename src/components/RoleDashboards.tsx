@@ -32,6 +32,7 @@ interface RoleDashboardsProps {
   config: PlatformConfig;
   onUpdateConfig: (newConfig: PlatformConfig) => void;
   onUpdateApplicationStatus: (appId: string, status: any, historyLog: string) => void;
+  onUpdateLabCapacity: (appId: string, topicId: string, status: 'valide' | 'refuse') => void;
   onUpdateDocVerification: (appId: string, docId: string, status: DocumentStatus, method: VerificationMethod, motif?: string, actionAttendue?: string) => void;
   onSaveProfessorAvis: (appId: string, topicId: string, avis: 'favorable' | 'reserve' | 'defavorable', motif: string) => void;
   onScheduleInterview: (appId: string, date: string, lieu: string) => void;
@@ -45,6 +46,7 @@ export const RoleDashboards: React.FC<RoleDashboardsProps> = ({
   config,
   onUpdateConfig,
   onUpdateApplicationStatus,
+  onUpdateLabCapacity,
   onUpdateDocVerification,
   onSaveProfessorAvis,
   onScheduleInterview,
@@ -54,9 +56,11 @@ export const RoleDashboards: React.FC<RoleDashboardsProps> = ({
   const [profAvis, setProfAvis] = useState<'favorable' | 'reserve' | 'defavorable'>('favorable');
   const [profMotif, setProfMotif] = useState('');
   
-  // Local state for CEDoc interview planning
-  const [interviewDate, setInterviewDate] = useState('18 Décembre 2026 à 10h00');
-  const [interviewLieu, setInterviewLieu] = useState('Salle des Actes, FST Fès');
+  // Local state for CEDoc interview planning, kept separately for each candidate.
+  const [interviewDates, setInterviewDates] = useState<Record<string, string>>({});
+  const [interviewTimes, setInterviewTimes] = useState<Record<string, string>>({});
+  const [interviewVenues, setInterviewVenues] = useState<Record<string, string>>({});
+  const [scheduledMessage, setScheduledMessage] = useState<Record<string, string>>({});
 
   // Local state for Admin campaign config
   const [localMaxSujets, setLocalMaxSujets] = useState(config.maxSujetsParCandidat);
@@ -273,32 +277,66 @@ export const RoleDashboards: React.FC<RoleDashboardsProps> = ({
             <h4 className="text-sm font-bold text-slate-900">
               Dossiers en attente d’arbitrage par le Conseil de Laboratoire
             </h4>
+            <p className="text-xs text-slate-600">
+              Décidez pour chaque sujet séparément. Un refus sur un sujet ne bloque pas les autres choix du candidat.
+            </p>
 
-            <div className="divide-y divide-slate-200 text-xs">
+            <div className="space-y-4 text-xs">
               {applications.map((app) => (
-                <div key={app.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-0.5">
+                <section key={app.id} className="rounded-lg border border-slate-200 p-4">
+                  <div className="mb-3">
                     <strong className="text-sm text-slate-900">{app.candidat.nom} {app.candidat.prenom}</strong>
-                    <div className="text-slate-500">
-                      Dossier : {app.numeroDossier} · Sujets : {app.sujetsChoisis.map((s) => s.code).join(', ')}
-                    </div>
+                    <div className="text-slate-500">Dossier : {app.numeroDossier}</div>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() =>
-                        onUpdateApplicationStatus(
-                          app.id,
-                          'examen_pedagogique',
-                          'Validation formelle par le conseil de laboratoire.'
-                        )
-                      }
-                      className="px-3 py-1.5 font-bold text-white bg-blue-900 hover:bg-blue-800 rounded-md transition-colors cursor-pointer"
-                    >
-                      Valider capacité d'accueil
-                    </button>
+                  <div className="space-y-3">
+                    {app.sujetsChoisis.map((topic) => {
+                      const decision = app.validationLaboratoire[topic.id];
+                      const accepted = decision?.statut === 'valide';
+                      const refused = decision?.statut === 'refuse';
+                      return (
+                        <div key={topic.id} className="flex flex-col gap-3 rounded-md bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-900">{topic.titre}</div>
+                            <div className="mt-1 text-slate-600">{topic.code} · {topic.etablissement}</div>
+                            <div className="text-slate-500">Laboratoire : {topic.laboratoire}</div>
+                            {decision && (
+                              <div className="mt-2 space-y-1" role="status" aria-live="polite">
+                                <div className={`inline-flex rounded-full px-2.5 py-1 font-semibold ${accepted ? 'bg-emerald-100 text-emerald-800' : refused ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
+                                  {accepted ? 'Capacité confirmée' : refused ? 'Capacité indisponible' : 'Complément demandé'}{decision.date ? ` · ${decision.date}` : ''}
+                                </div>
+                                <p className="text-slate-600">
+                                  {accepted
+                                    ? 'Décision enregistrée. Ce sujet peut poursuivre après les autres validations requises.'
+                                    : refused
+                                      ? 'Décision enregistrée. Ce choix s’arrête ici ; les autres sujets du candidat restent examinés.'
+                                      : 'Un complément est nécessaire avant la suite du traitement.'}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onUpdateLabCapacity(app.id, topic.id, 'valide')}
+                              aria-pressed={accepted}
+                              className={`min-h-10 rounded-md px-3 py-2 font-bold transition-colors ${accepted ? 'bg-emerald-700 text-white' : 'border border-emerald-700 bg-white text-emerald-800 hover:bg-emerald-50'}`}
+                            >
+                              Confirmer l’accueil
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateLabCapacity(app.id, topic.id, 'refuse')}
+                              aria-pressed={refused}
+                              className={`min-h-10 rounded-md px-3 py-2 font-semibold transition-colors ${refused ? 'bg-rose-700 text-white' : 'border border-rose-300 bg-white text-rose-800 hover:bg-rose-50'}`}
+                            >
+                              Indisponible
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
+                </section>
               ))}
             </div>
           </div>
@@ -345,27 +383,62 @@ export const RoleDashboards: React.FC<RoleDashboardsProps> = ({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <input
-                      type="text"
-                      value={interviewDate}
-                      onChange={(e) => setInterviewDate(e.target.value)}
-                      placeholder="Date et heure de l'entretien"
-                      className="px-3 py-1.5 bg-white border border-slate-300 rounded text-slate-900"
-                    />
-                    <input
-                      type="text"
-                      value={interviewLieu}
-                      onChange={(e) => setInterviewLieu(e.target.value)}
-                      placeholder="Lieu / Salle des actes"
-                      className="px-3 py-1.5 bg-white border border-slate-300 rounded text-slate-900"
-                    />
-                    <button
-                      onClick={() => onScheduleInterview(app.id, interviewDate, interviewLieu)}
-                      className="px-4 py-1.5 font-bold text-white bg-blue-900 hover:bg-blue-800 rounded transition-colors cursor-pointer"
-                    >
-                      Notifier & Convoquer le candidat
-                    </button>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <label className="space-y-1">
+                      <span className="block font-semibold text-slate-700">Date de l’entretien</span>
+                      <input
+                        type="date"
+                        min={new Date().toISOString().slice(0, 10)}
+                        value={interviewDates[app.id] || ''}
+                        onChange={(e) => setInterviewDates((prev) => ({ ...prev, [app.id]: e.target.value }))}
+                        className="min-h-10 w-full rounded border border-slate-300 bg-white px-3 text-slate-900"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block font-semibold text-slate-700">Heure</span>
+                      <select
+                        value={interviewTimes[app.id] || ''}
+                        onChange={(e) => setInterviewTimes((prev) => ({ ...prev, [app.id]: e.target.value }))}
+                        className="min-h-10 w-full rounded border border-slate-300 bg-white px-3 text-slate-900"
+                      >
+                        <option value="">Choisir une heure</option>
+                        {Array.from({ length: 18 }, (_, index) => {
+                          const minutes = 8 * 60 + index * 30;
+                          const hour = String(Math.floor(minutes / 60)).padStart(2, '0');
+                          const minute = String(minutes % 60).padStart(2, '0');
+                          return <option key={`${hour}:${minute}`} value={`${hour}:${minute}`}>{hour}:{minute}</option>;
+                        })}
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block font-semibold text-slate-700">Lieu</span>
+                      <select
+                        value={interviewVenues[app.id] || ''}
+                        onChange={(e) => setInterviewVenues((prev) => ({ ...prev, [app.id]: e.target.value }))}
+                        className="min-h-10 w-full rounded border border-slate-300 bg-white px-3 text-slate-900"
+                      >
+                        <option value="">Choisir un établissement</option>
+                        {Array.from(new Set(app.sujetsChoisis.map((topic) => topic.etablissement))).map((venue) => (
+                          <option key={venue} value={`Salle des Actes — ${venue}`}>Salle des Actes — {venue}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="flex flex-col justify-end gap-2">
+                      <button
+                        type="button"
+                        disabled={!interviewDates[app.id] || !interviewTimes[app.id] || !interviewVenues[app.id]}
+                        onClick={() => {
+                          const date = new Date(`${interviewDates[app.id]}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+                          const dateTime = `${date} à ${interviewTimes[app.id]}`;
+                          onScheduleInterview(app.id, dateTime, interviewVenues[app.id]);
+                          setScheduledMessage((prev) => ({ ...prev, [app.id]: 'Convocation enregistrée dans cette démonstration.' }));
+                        }}
+                        className="min-h-10 rounded bg-blue-900 px-4 py-2 font-bold text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {app.validationCedoc?.dateEntretien ? 'Mettre à jour la convocation' : 'Notifier & convoquer'}
+                      </button>
+                      {scheduledMessage[app.id] && <p className="text-emerald-800" role="status" aria-live="polite">{scheduledMessage[app.id]}</p>}
+                    </div>
                   </div>
                 </div>
               ))}

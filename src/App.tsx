@@ -174,6 +174,41 @@ export default function App() {
     );
   };
 
+  const handleUpdateLabCapacity = (
+    appId: string,
+    topicId: string,
+    status: 'valide' | 'refuse'
+  ) => {
+    setApplications((prev) =>
+      prev.map((app) => {
+        if (app.id !== appId) return app;
+        const topic = app.sujetsChoisis.find((selectedTopic) => selectedTopic.id === topicId);
+        const decisionText = status === 'valide' ? 'capacité d’accueil confirmée' : 'capacité d’accueil indisponible';
+        return {
+          ...app,
+          validationLaboratoire: {
+            ...app.validationLaboratoire,
+            [topicId]: {
+              laboratoireNom: topic?.laboratoire || 'Laboratoire concerné',
+              statut: status,
+              date: new Date().toLocaleDateString('fr-FR'),
+            },
+          },
+          historique: [
+            {
+              id: `h-${Date.now()}`,
+              date: `${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`,
+              acteur: 'Conseil du laboratoire',
+              role: 'Laboratoire',
+              action: `Pour le sujet ${topic?.code || topicId} : ${decisionText}.`,
+            },
+            ...app.historique,
+          ],
+        };
+      })
+    );
+  };
+
   const handleUpdateDocVerification = (
     appId: string,
     docId: string,
@@ -412,6 +447,7 @@ export default function App() {
             config={config}
             onUpdateConfig={setConfig}
             onUpdateApplicationStatus={handleUpdateApplicationStatus}
+            onUpdateLabCapacity={handleUpdateLabCapacity}
             onUpdateDocVerification={handleUpdateDocVerification}
             onSaveProfessorAvis={handleSaveProfessorAvis}
             onScheduleInterview={handleScheduleInterview}
