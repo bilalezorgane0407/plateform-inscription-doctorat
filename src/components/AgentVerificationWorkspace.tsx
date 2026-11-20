@@ -166,7 +166,7 @@ export const AgentVerificationWorkspace: React.FC<AgentVerificationWorkspaceProp
               Ouvrez une pièce, examinez-la, puis enregistrez une décision avec son motif. L’OCR aide à lire le document; il ne confirme pas son authenticité.
             </p>
             <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-              Mode démonstration : les décisions et les fichiers restent temporaires dans cette session. Aucun stockage sécurisé ni envoi réel au candidat n’est connecté.
+              Démonstration locale : les décisions et fichiers sont conservés dans ce navigateur (IndexedDB). Ce stockage n’est ni chiffré ni sécurisé pour des dossiers officiels ; aucune notification réelle n’est envoyée.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:min-w-[300px]">
@@ -388,7 +388,7 @@ export const AgentVerificationWorkspace: React.FC<AgentVerificationWorkspaceProp
                     {selectedDocument.ocrLu && selectedDocument.ocrData ? (
                       <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3">
                         <h4 className="text-sm font-bold text-blue-950">Lecture OCR — à confirmer visuellement</h4>
-                        <p className="mt-1 text-xs text-blue-900">Les champs ci-dessous sont une aide de lecture. Comparez-les avec l’aperçu.</p>
+                        <p className="mt-1 text-xs text-blue-900">Le texte ci-dessous est une aide de lecture. Comparez-le avec l’aperçu avant votre décision.</p>
                         <dl className="mt-3 space-y-2 text-sm">
                           {[
                             ['Nom', selectedDocument.ocrData.nom?.value],
@@ -403,6 +403,15 @@ export const AgentVerificationWorkspace: React.FC<AgentVerificationWorkspaceProp
                             </div>
                           ))}
                         </dl>
+                        {selectedDocument.ocrData.rawPreview && (
+                          <details className="mt-3 border-t border-blue-200 pt-3">
+                            <summary className="cursor-pointer text-xs font-semibold text-blue-950">Afficher tout le texte OCR</summary>
+                            <pre dir="auto" className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-3 text-xs text-slate-800">{selectedDocument.ocrData.rawPreview}</pre>
+                          </details>
+                        )}
+                        {typeof selectedDocument.ocrData.rawConfidence === 'number' && (
+                          <p className="mt-2 text-[11px] text-slate-600">Confiance OCR moyenne : {Math.round(selectedDocument.ocrData.rawConfidence)} % (lecture uniquement).</p>
+                        )}
                       </div>
                     ) : (
                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">

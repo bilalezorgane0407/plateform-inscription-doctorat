@@ -16,9 +16,11 @@ import {
 } from 'lucide-react';
 import { CandidateProfile, AcademicPathway, Topic } from '../types';
 import { DEMO_PROFILES } from '../data/mockData';
+import { findDemoAccount, registerDemoCandidate, resetDemoData } from '../utils/demoStorage';
+import { UserRole } from '../types';
 
 interface AuthScreenProps {
-  onLoginSuccess: (profile: CandidateProfile) => void;
+  onLoginSuccess: (profile: CandidateProfile, role?: UserRole, displayName?: string) => void;
   onCancel: () => void;
   selectedTopics: Topic[];
 }
@@ -50,11 +52,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const profile = DEMO_PROFILES.lmd;
-    onLoginSuccess({
-      ...profile,
-      email: loginEmail || profile.email,
-    });
+    const account = findDemoAccount(loginEmail, loginPassword);
+    if (!account) {
+      setFeedbackMessage('Adresse ou mot de passe incorrect. Pour tester, utilisez un compte de démonstration ci-dessous.');
+      return;
+    }
+    const profile = account.profile || (account.role === 'candidat'
+      ? DEMO_PROFILES.lmd
+      : { ...DEMO_PROFILES.lmd, id: `staff-demo-${account.role}`, email: account.email, prenom: account.displayName.split(' ')[0], nom: account.displayName.split(' ').slice(1).join(' ') });
+    onLoginSuccess(profile, account.role, account.displayName);
   };
 
   const handleRegister = (e: React.FormEvent) => {
@@ -67,30 +73,51 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       telephone: telephone,
       cin: cin.toUpperCase(),
       cneMassar: cneMassar.toUpperCase(),
-      dateNaissance: '2001-01-01',
+      dateNaissance: '',
       nationalite: 'Marocaine',
       ville: 'Fès',
       parcours: parcours,
       derniereFormation: {
-        intituleDiplome: parcours === 'ingenieur' 
-          ? 'Diplôme d’Ingénieur d’État' 
-          : parcours === 'etranger_equivalence' 
-            ? 'Master International' 
-            : 'Master de Recherche',
-        specialite: 'Informatique / Sciences',
-        etablissement: parcours === 'ingenieur' ? 'ENSA Fès' : 'FS Dhar El Mahraz Fès',
-        anneeObtention: '2026',
-        mention: 'Bien',
-        moyenneGenerale: '14.5',
+        intituleDiplome: '',
+        specialite: '',
+        etablissement: '',
+        anneeObtention: '',
+        mention: '',
+        moyenneGenerale: '',
         paysObtention: parcours === 'etranger_equivalence' ? 'France' : 'Maroc',
       },
       estSalarie: false,
     };
-    onLoginSuccess(newProfile);
+    try {
+      registerDemoCandidate({ email, password, role: 'candidat', displayName: `${prenom} ${nom.toUpperCase()}`, profile: newProfile });
+      onLoginSuccess(newProfile, 'candidat', `${prenom} ${nom.toUpperCase()}`);
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : 'Impossible de créer ce compte local.');
+    }
   };
 
-  const handleQuickDemoLogin = (key: 'lmd' | 'ingenieur' | 'etranger') => {
-    onLoginSuccess(DEMO_PROFILES[key]);
+  const demoLogins = [
+    ['candidat.demo@example.com', 'Candidat'],
+    ['encadrant.demo@example.com', 'Directeur de thèse'],
+    ['laboratoire.demo@example.com', 'Laboratoire'],
+    ['agent.demo@example.com', 'Agent de scolarité'],
+    ['cedoc.demo@example.com', 'CEDoc'],
+    ['admin.demo@example.com', 'Administration'],
+  ] as const;
+  const openDemoAccount = (emailAddress: string) => {
+    setLoginEmail(emailAddress);
+    setLoginPassword('DoctoratDemo2026!');
+    const account = findDemoAccount(emailAddress, 'DoctoratDemo2026!');
+    if (!account) return;
+    const profile = account.profile || (account.role === 'candidat'
+      ? DEMO_PROFILES.lmd
+      : { ...DEMO_PROFILES.lmd, id: `staff-demo-${account.role}`, email: account.email, prenom: account.displayName.split(' ')[0], nom: account.displayName.split(' ').slice(1).join(' ') });
+    onLoginSuccess(profile, account.role, account.displayName);
+  };
+  const handleResetDemo = async () => {
+    if (!window.confirm('Effacer les comptes créés, candidatures, fichiers et décisions de démonstration enregistrés dans ce navigateur ? Cette action ne peut pas être annulée.')) return;
+    try { await resetDemoData(); window.location.reload(); }
+    catch (error) { setFeedbackMessage(error instanceof Error ? error.message : 'La réinitialisation a échoué.'); }
   };
 
   return (
@@ -256,48 +283,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </button>
               </form>
 
-              {/* Demo quick sign-in */}
               <div className="pt-6 border-t border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Démonstration : Connexion rapide en 1 clic
-                  </span>
-                  <span className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                    Simulation sans mot de passe
-                  </span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Comptes de démonstration — accès par rôle</span>
+                  <span className="text-[11px] text-amber-800 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">Local uniquement</span>
                 </div>
+                <p className="text-xs text-slate-600">Mot de passe commun : <strong>DoctoratDemo2026!</strong>. Ces comptes sont fictifs et ne sont pas des comptes institutionnels.</p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('lmd')}
-                    className="p-3 border border-slate-300 rounded-xl hover:border-blue-900 hover:bg-blue-50/50 text-left transition-colors cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-900 block truncate">Mehdi EL AMRANI</span>
-                    <span className="text-blue-900 text-[11px] font-semibold block">Master LMD (FST)</span>
-                    <span className="text-slate-500 text-[10px]">Candidature avec pièce à corriger</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('ingenieur')}
-                    className="p-3 border border-slate-300 rounded-xl hover:border-blue-900 hover:bg-blue-50/50 text-left transition-colors cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-900 block truncate">Yassine BENNANI</span>
-                    <span className="text-blue-900 text-[11px] font-semibold block">Ingénieur d’État (ENSA)</span>
-                    <span className="text-slate-500 text-[10px]">Parcours 5 ans sans licence</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('etranger')}
-                    className="p-3 border border-slate-300 rounded-xl hover:border-blue-900 hover:bg-blue-50/50 text-left transition-colors cursor-pointer"
-                  >
-                    <span className="font-bold text-slate-900 block truncate">Salma ALAMI</span>
-                    <span className="text-blue-900 text-[11px] font-semibold block">Diplôme Étranger</span>
-                    <span className="text-slate-500 text-[10px]">Avec équivalence ministérielle</span>
-                  </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                  {demoLogins.map(([address, label]) => (
+                    <button key={address} type="button" onClick={() => openDemoAccount(address)} className="p-3 border border-slate-300 rounded-xl hover:border-blue-900 hover:bg-blue-50/50 text-left transition-colors">
+                      <span className="font-bold text-slate-900 block">{label}</span>
+                      <span className="text-slate-500 text-[10px] break-all">{address}</span>
+                    </button>
+                  ))}
                 </div>
+                <button type="button" onClick={handleResetDemo} className="text-xs font-semibold text-rose-800 underline underline-offset-2">Réinitialiser les données de démonstration de ce navigateur</button>
               </div>
             </div>
           )}
@@ -416,9 +417,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </div>
 
               <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-600 space-y-1">
-                <p>
-                  ✓ <strong>Activation immédiate :</strong> Le compte est activé instantanément pour ce prototype.
-                </p>
+              <p>✓ <strong>Compte local :</strong> créé et conservé dans ce navigateur pour cette démonstration.</p>
                 <p>
                   ✓ <strong>Conservation du panier :</strong> Vos {cartCount} sujet(s) seront rattachés directement à votre candidature.
                 </p>
@@ -463,10 +462,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           )}
 
           {/* Explicit disclaimer about simulated auth */}
-          <div className="pt-4 border-t border-slate-100 flex items-start gap-2 text-xs text-slate-500">
+      <div className="pt-4 border-t border-slate-100 flex items-start gap-2 text-xs text-slate-500">
             <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
             <span>
-              <strong>Démonstration — vérification réelle non connectée :</strong> Ce module d'authentification est un prototype fonctionnel destiné à tester le flux utilisateur et ne conserve aucune donnée sur des serveurs gouvernementaux.
+              <strong>Démonstration locale :</strong> les comptes, profils et dossiers restent dans ce navigateur. Ne saisissez pas de données personnelles réelles ni de pièces officielles ; ce prototype ne fournit ni sécurité ni authentification institutionnelle.
             </span>
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { HomeHero } from './components/HomeHero';
 import { TopicsCatalogue } from './components/TopicsCatalogue';
@@ -25,6 +25,7 @@ import {
   VerificationMethod
 } from './types';
 import { GraduationCap, ShieldCheck, HelpCircle } from 'lucide-react';
+import { readApplications, readCart, readProfile, restoreApplicationPreviews, writeApplications, writeCart, writeProfile } from './utils/demoStorage';
 
 export default function App() {
   // Navigation
@@ -38,17 +39,32 @@ export default function App() {
   const [selectedTopicModal, setSelectedTopicModal] = useState<Topic | null>(null);
 
   // Cart: Up to 3 topics by default, not ranked. Initialized empty!
-  const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);
+  const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(readCart);
 
   // Auth & Roles
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userRole, setUserRole] = useState<UserRole>('visiteur');
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
-  const [candidateProfile, setCandidateProfile] = useState<CandidateProfile>(DEMO_PROFILES.lmd);
+  const [candidateProfile, setCandidateProfile] = useState<CandidateProfile>(readProfile() || DEMO_PROFILES.lmd);
+  const [currentUserName, setCurrentUserName] = useState<string | undefined>();
+  const [storageReady, setStorageReady] = useState(false);
 
   // Applications
-  const [applications, setApplications] = useState<Application[]>(SAMPLE_APPLICATIONS);
-  const [currentApplicationId, setCurrentApplicationId] = useState<string>(SAMPLE_APPLICATIONS[0].id);
+  const [applications, setApplications] = useState<Application[]>(readApplications() || SAMPLE_APPLICATIONS);
+  const [currentApplicationId, setCurrentApplicationId] = useState<string>((readApplications() || SAMPLE_APPLICATIONS)[0]?.id || '');
+
+  useEffect(() => {
+    const stored = readApplications();
+    if (stored?.length) restoreApplicationPreviews(stored).then((restored) => {
+      setApplications(restored);
+      setCurrentApplicationId((current) => current || restored[0]?.id || '');
+      setStorageReady(true);
+    }).catch(() => setStorageReady(true));
+    else setStorageReady(true);
+  }, []);
+  useEffect(() => { writeCart(selectedTopicIds); }, [selectedTopicIds]);
+  useEffect(() => { if (storageReady) writeApplications(applications); }, [applications, storageReady]);
+  useEffect(() => { if (userRole === 'candidat') writeProfile(candidateProfile); }, [candidateProfile, userRole]);
 
   // Toggle topic selection in cart
   const handleToggleSelectTopic = (topic: Topic) => {
@@ -78,17 +94,20 @@ export default function App() {
   };
 
   // Successful auth: preserve cart and proceed
-  const handleLoginSuccess = (profile: CandidateProfile) => {
+  const handleLoginSuccess = (profile: CandidateProfile, role: UserRole = 'candidat', displayName?: string) => {
     setCandidateProfile(profile);
     setIsAuthenticated(true);
-    setUserRole('candidat');
+    setUserRole(role);
+    setCurrentUserName(displayName || `${profile.prenom} ${profile.nom}`);
     setAuthModalOpen(false);
-    setCurrentTab('candidature');
+    setCurrentTab(role === 'candidat' ? 'candidature' : 'acteurs');
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     setUserRole('visiteur');
+    setCurrentUserName(undefined);
+    setCurrentTab('catalogue');
   };
 
   // Submit new application
@@ -336,7 +355,9 @@ export default function App() {
 
   // Cart topics
   const selectedTopics = topics.filter((t) => selectedTopicIds.includes(t.id));
-  const activeApp = applications.find((a) => a.id === currentApplicationId) || applications[0];
+  const candidateApplications = applications.filter((app) => app.candidat.id === candidateProfile.id);
+  const activeApp = applications.find((a) => a.id === currentApplicationId)
+    || (userRole === 'candidat' ? candidateApplications[0] : applications[0]);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
@@ -347,21 +368,8 @@ export default function App() {
         onSelectTab={setCurrentTab}
         cartCount={selectedTopicIds.length}
         userRole={userRole}
-        onChangeUserRole={(role) => {
-          setUserRole(role);
-          if (role === 'visiteur') {
-            setIsAuthenticated(false);
-            setCurrentTab('catalogue');
-          } else if (role === 'candidat') {
-            setIsAuthenticated(true);
-            setCurrentTab('catalogue');
-          } else {
-            setIsAuthenticated(true);
-            setCurrentTab('acteurs');
-          }
-        }}
         isAuthenticated={isAuthenticated}
-        currentUserNom={candidateProfile ? `${candidateProfile.prenom} ${candidateProfile.nom}` : undefined}
+        currentUserNom={currentUserName || `${candidateProfile.prenom} ${candidateProfile.nom}`}
         onOpenAuth={() => setCurrentTab('auth')}
         onLogout={handleLogout}
       />
@@ -429,12 +437,20 @@ export default function App() {
 
         {/* Tab 4: Suivi Candidat */}
         {currentTab === 'suivi' && (
-          <TrackingView
-            application={activeApp}
-            onUpdateDocumentStatus={handleUpdateDocumentStatus}
-            onSelectApplicationById={(id) => setCurrentApplicationId(id)}
-            sampleApplications={applications}
-          />
+          userRole === 'candidat' && candidateApplications.length === 0 ? (
+            <section className="mx-auto my-12 max-w-2xl rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+              <h1 className="text-xl font-bold text-slate-900">Aucune candidature soumise</h1>
+              <p className="mt-2 text-sm text-slate-600">Votre espace affichera le suivi dès que vous aurez soumis un dossier.</p>
+              <button onClick={() => setCurrentTab('candidature')} className="mt-5 rounded-lg bg-blue-900 px-5 py-3 text-sm font-bold text-white">Reprendre ma candidature</button>
+            </section>
+          ) : activeApp ? (
+            <TrackingView
+              application={activeApp}
+              onUpdateDocumentStatus={handleUpdateDocumentStatus}
+              onSelectApplicationById={(id) => setCurrentApplicationId(id)}
+              sampleApplications={userRole === 'candidat' ? candidateApplications : applications}
+            />
+          ) : null
         )}
 
         {/* Tab 5: Espaces Acteurs & Administration */}

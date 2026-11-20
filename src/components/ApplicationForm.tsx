@@ -36,9 +36,10 @@ import {
 import { 
   getRequiredDocumentsForPathway, 
   diagnoseCandidateSubjectFit, 
-  simulateOcrExtraction, 
   generateDossierNumber 
 } from '../utils/rules';
+import { extractTextFromDocument } from '../utils/browserOcr';
+import { loadDocumentBlob, saveDocumentBlob } from '../utils/demoStorage';
 
 interface ApplicationFormProps {
   candidateProfile: CandidateProfile;
@@ -61,16 +62,24 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
 
   // Local state for documents
   const [documents, setDocuments] = useState<CandidateDocument[]>(() => {
-    return getRequiredDocumentsForPathway(
+    const defaults = getRequiredDocumentsForPathway(
       candidateProfile.parcours,
       candidateProfile.estSalarie
     );
+    try {
+      const saved = JSON.parse(localStorage.getItem(`usmba-demo-draft:${candidateProfile.id}`) || 'null') as CandidateDocument[] | null;
+      return saved?.length ? saved : defaults;
+    } catch { return defaults; }
   });
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   // Track active OCR extraction modal/drawer
   const [activeOcrDoc, setActiveOcrDoc] = useState<CandidateDocument | null>(null);
   const [ocrWorking, setOcrWorking] = useState(false);
   const [ocrDraftFields, setOcrDraftFields] = useState<OcrExtractedData | null>(null);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrPageIndex, setOcrPageIndex] = useState(0);
 
   // File upload validation errors
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
@@ -114,6 +123,9 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
     const previousPreview = documents.find((document) => document.id === docId)?.fichierApercuUrl;
     if (previousPreview?.startsWith('blob:')) URL.revokeObjectURL(previousPreview);
     const previewUrl = URL.createObjectURL(file);
+    void saveDocumentBlob(`draft:${candidateProfile.id}:${docId}`, file).catch(() => {
+      setFileErrors((prev) => ({ ...prev, [docId]: 'Le navigateur n’a pas pu conserver ce fichier. Vérifiez l’espace de stockage disponible.' }));
+    });
     const previewMimeType = file.type || (fileNameLower.endsWith('.pdf')
       ? 'application/pdf'
       : fileNameLower.endsWith('.png')
@@ -154,21 +166,52 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
     });
   }, [candidateProfile.parcours, candidateProfile.estSalarie]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(`usmba-demo-draft:${candidateProfile.id}`) || 'null') as CandidateDocument[] | null;
+        if (!saved?.length) { setDraftLoaded(true); return; }
+        const hydrated = await Promise.all(saved.map(async (doc) => {
+          const blob = await loadDocumentBlob(`draft:${candidateProfile.id}:${doc.id}`);
+          return blob ? { ...doc, fichierApercuUrl: URL.createObjectURL(blob) } : doc;
+        }));
+        if (!cancelled) { setDocuments(hydrated); setDraftLoaded(true); }
+      } catch { if (!cancelled) setDraftLoaded(true); }
+    };
+    void hydrate();
+    return () => { cancelled = true; };
+  }, [candidateProfile.id]);
+
+  useEffect(() => {
+    if (!draftLoaded) return;
+    const safeDocuments = documents.map(({ fichierApercuUrl: _preview, ...doc }) => doc);
+    localStorage.setItem(`usmba-demo-draft:${candidateProfile.id}`, JSON.stringify(safeDocuments));
+  }, [documents, draftLoaded, candidateProfile.id]);
+
   // Compute diagnostic for each selected topic
   const topicDiagnostics = selectedTopics.map((t) => ({
     topic: t,
     diagnostic: diagnoseCandidateSubjectFit(candidateProfile, t, documents),
   }));
 
-  // Handle OCR simulation on a document
-  const handleStartOcrSimulation = (doc: CandidateDocument) => {
+  // OCR réel dans le navigateur : le contenu du document n'est pas envoyé à un serveur.
+  const handleStartOcrSimulation = async (doc: CandidateDocument) => {
     setActiveOcrDoc(doc);
     setOcrWorking(true);
-    setTimeout(() => {
-      const extracted = simulateOcrExtraction(doc.code, candidateProfile.parcours, candidateProfile);
-      setOcrDraftFields(extracted);
-      setOcrWorking(false);
-    }, 700);
+    setOcrError(null);
+    setOcrDraftFields(null);
+    setOcrProgress(0);
+    setOcrPageIndex(0);
+    try {
+      const blob = await loadDocumentBlob(`draft:${candidateProfile.id}:${doc.id}`);
+      if (!blob) throw new Error('Sélectionnez d’abord un fichier réel pour cette pièce.');
+      const file = new globalThis.File([blob], doc.fichierNom || 'document', { type: doc.fichierTypeMime || blob.type });
+      const extracted = await extractTextFromDocument(file, setOcrProgress);
+      setOcrDraftFields({ rawPreview: extracted.text, rawConfidence: extracted.confidence, ocrPages: extracted.pages, sourceType: file.type === 'application/pdf' ? 'pdf' : 'photo' });
+    } catch (error) {
+      setOcrError(error instanceof Error ? error.message : 'La lecture OCR a échoué.');
+    } finally { setOcrWorking(false); }
   };
 
   // Confirm OCR extracted values
@@ -181,13 +224,10 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
           return {
             ...d,
             statut: 'recue',
-            fichierNom: `${d.code}_scan_certifie.pdf`,
-            fichierTaille: '1.4 Mo',
-            fichierDate: new Date().toLocaleDateString('fr-FR'),
             ocrLu: true,
             ocrData: ocrDraftFields,
-            // Per rule 9 & F: scan / OCR is NOT automatically authenticated!
-            methodeVerification: d.code === 'cin_passeport' ? 'qr_officiel' : 'agent_manuel',
+            // L'OCR extrait le texte, il ne vérifie pas l'authenticité du document.
+            methodeVerification: 'non_verifie',
           };
         }
         return d;
@@ -327,7 +367,11 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
       },
     };
 
-    onSubmitApplication(newApp);
+    void Promise.all(documents.map(async (doc) => {
+      if (!doc.fichierNom) return;
+      const blob = await loadDocumentBlob(`draft:${candidateProfile.id}:${doc.id}`);
+      if (blob) await saveDocumentBlob(`${newApp.id}:${doc.id}`, blob);
+    })).then(() => onSubmitApplication(newApp));
   };
 
   return (
@@ -1347,10 +1391,12 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
                   <p className="text-sm font-semibold text-slate-800">
                     Analyse du document et reconnaissance optique en cours...
                   </p>
-                  <p className="text-xs text-slate-500">
-                    Détection des sceaux, intitulé de diplôme, nom et notes.
-                  </p>
+                  <p className="text-xs text-slate-500">Lecture du texte français et arabe. Le fichier est traité dans ce navigateur.</p>
+                  <div className="mx-auto w-64 h-2 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-blue-800 transition-all" style={{ width: `${Math.round(ocrProgress * 100)}%` }} /></div>
+                  <p className="text-xs text-slate-500">{Math.round(ocrProgress * 100)} %</p>
                 </div>
+              ) : ocrError ? (
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-900" role="alert">{ocrError}</div>
               ) : ocrDraftFields ? (
                 <div className="space-y-4">
                   
@@ -1358,8 +1404,8 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-950 flex items-start gap-2">
                     <Info className="w-4 h-4 text-amber-800 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="font-bold text-amber-900 block">Vérification obligatoire par le candidat :</strong>
-                      Veuillez vérifier et corriger si nécessaire les champs extraits ci-dessous. Les valeurs à confiance modérée sont signalées en ambre.
+                      <strong className="font-bold text-amber-900 block">Texte extrait du fichier :</strong>
+                      Relisez le texte et comparez-le à l’aperçu du document. L’OCR peut faire des erreurs, surtout sur les photos floues ou les documents en arabe.
                     </div>
                   </div>
 
@@ -1367,9 +1413,18 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
                   {ocrDraftFields.rawPreview && (
                     <div className="p-3 bg-slate-900 text-slate-200 rounded-lg text-xs font-mono space-y-1">
                       <span className="text-[10px] text-slate-400 uppercase tracking-wider block">
-                        Flux brut détecté sur le document :
+                        Texte de la page {ocrPageIndex + 1} / {ocrDraftFields.ocrPages?.length || 1} :
                       </span>
-                      <pre className="whitespace-pre-wrap text-[11px]">{ocrDraftFields.rawPreview}</pre>
+                      <pre dir="auto" className="max-h-64 overflow-auto whitespace-pre-wrap text-[11px]">{ocrDraftFields.ocrPages?.[ocrPageIndex]?.text || ocrDraftFields.rawPreview}</pre>
+                      <span className="text-[10px] text-amber-300 block pt-2">Confiance OCR moyenne : {Math.round(ocrDraftFields.rawConfidence || 0)} % — indicateur de lecture uniquement, aucune authentification.</span>
+                    </div>
+                  )}
+
+                  {(ocrDraftFields.ocrPages?.length || 0) > 1 && (
+                    <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                      <button type="button" disabled={ocrPageIndex === 0} onClick={() => setOcrPageIndex((page) => Math.max(0, page - 1))} className="rounded border border-slate-300 px-3 py-1.5 text-xs disabled:opacity-40">Page précédente</button>
+                      <span className="text-xs text-slate-700">Page {ocrPageIndex + 1} sur {ocrDraftFields.ocrPages?.length}</span>
+                      <button type="button" disabled={ocrPageIndex >= (ocrDraftFields.ocrPages?.length || 1) - 1} onClick={() => setOcrPageIndex((page) => Math.min((ocrDraftFields.ocrPages?.length || 1) - 1, page + 1))} className="rounded border border-slate-300 px-3 py-1.5 text-xs disabled:opacity-40">Page suivante</button>
                     </div>
                   )}
 
@@ -1508,11 +1563,11 @@ export const ApplicationForm: React.FC<ApplicationFormProps> = ({
 
               <button
                 onClick={handleConfirmOcrFields}
-                disabled={ocrWorking}
+                disabled={ocrWorking || !ocrDraftFields}
                 className="px-5 py-2 text-xs font-bold text-white bg-blue-900 hover:bg-blue-800 rounded-lg transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
               >
                 <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                <span>Confirmer et valider cette pièce</span>
+                <span>Enregistrer le texte extrait</span>
               </button>
             </div>
 

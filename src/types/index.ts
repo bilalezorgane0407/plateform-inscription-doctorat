@@ -36,6 +36,8 @@ export interface OcrExtractedData {
   mention?: { value: string; confidence: number; confirmed: boolean };
   dateObtention?: { value: string; confidence: number; confirmed: boolean };
   rawPreview?: string;
+  rawConfidence?: number;
+  ocrPages?: Array<{ page: number; text: string; confidence: number }>;
   sourceType?: 'pdf' | 'photo';
 }
 

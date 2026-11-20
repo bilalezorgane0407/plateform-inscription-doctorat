@@ -7,7 +7,6 @@ import {
   Settings, 
   User, 
   LogOut, 
-  CheckCircle2, 
   HelpCircle,
   Menu,
   X
@@ -19,7 +18,6 @@ interface NavbarProps {
   onSelectTab: (tab: string) => void;
   cartCount: number;
   userRole: UserRole;
-  onChangeUserRole: (role: UserRole) => void;
   isAuthenticated: boolean;
   currentUserNom?: string;
   onOpenAuth: () => void;
@@ -31,14 +29,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectTab,
   cartCount,
   userRole,
-  onChangeUserRole,
   isAuthenticated,
   currentUserNom,
   onOpenAuth,
   onLogout,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const [roleMenuOpen, setRoleMenuOpen] = React.useState(false);
 
   const roleLabels: Record<UserRole, string> = {
     visiteur: 'Visiteur (Public)',
@@ -132,56 +128,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Zone 3: 1 Primary Action Area & Role Switcher */}
           <div className="flex items-center gap-2">
-            {/* Role dropdown simulator for demonstrator */}
-            <div className="relative">
-              <button
-                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                className="text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-md px-2.5 py-2 flex items-center gap-1.5 transition-colors"
-                title="Changer de rôle pour tester les différentes vues"
-                aria-expanded={roleMenuOpen}
-              >
-                <span className="text-slate-500 hidden sm:inline">Démo :</span>
-                <span className="font-semibold text-blue-950 truncate max-w-[120px] sm:max-w-[160px]">
-                  {roleLabels[userRole]}
-                </span>
-              </button>
-
-              {roleMenuOpen && (
-                <div 
-                  className="absolute right-0 mt-1 w-72 bg-white border border-slate-200 rounded-lg shadow-lg py-2 z-50 text-xs"
-                  onClick={() => setRoleMenuOpen(false)}
-                >
-                  <div className="px-3 pb-1 border-b border-slate-100">
-                    <span className="font-bold text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider block">
-                      Mode démonstration
-                    </span>
-                    <span className="text-[11px] text-slate-500 mt-1 block">
-                      Sélecteur de vue (simulation sans contrôle d'accès réel)
-                    </span>
-                  </div>
-                  <div className="pt-1.5">
-                    {(Object.keys(roleLabels) as UserRole[]).map((role) => (
-                      <button
-                        key={role}
-                        onClick={() => onChangeUserRole(role)}
-                        className={`w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between ${
-                          userRole === role ? 'font-semibold text-blue-900 bg-blue-50/50' : 'text-slate-700'
-                        }`}
-                      >
-                        <span>{roleLabels[role]}</span>
-                        {userRole === role && <CheckCircle2 className="w-4 h-4 text-blue-700" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="text-xs font-semibold text-blue-950 bg-blue-50 border border-blue-200 rounded-md px-2.5 py-2">
+              <span className="text-slate-500 hidden sm:inline">{isAuthenticated ? 'Compte démo : ' : 'Mode : '}</span>
+              <span>{roleLabels[userRole]}</span>
             </div>
 
             {/* Auth / Account status */}
             {isAuthenticated ? (
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => onSelectTab('candidature')}
+                  onClick={() => onSelectTab(userRole === 'candidat' ? 'candidature' : 'acteurs')}
                   className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-950 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
                 >
                   <User className="w-3.5 h-3.5 text-blue-800" />

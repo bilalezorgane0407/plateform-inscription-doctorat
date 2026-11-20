@@ -103,7 +103,7 @@ export const RoleDashboards: React.FC<RoleDashboardsProps> = ({
             { id: 'laboratoire', label: 'Laboratoire' },
             { id: 'cedoc', label: 'CEDoc' },
             { id: 'administrateur', label: 'Administration' },
-          ].map((tab) => (
+          ].filter((tab) => tab.id === currentRole).map((tab) => (
             <button
               key={tab.id}
               type="button"
